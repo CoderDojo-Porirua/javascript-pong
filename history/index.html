@@ -17,33 +17,33 @@
       <li><a href='/part1'><i>game runner</i> - Part 1</a></li>
       <li><a href='/part2'><i>bouncing ball</i> - Part 2</a></li>
       <li><a href='/part3'><i>game loop</i> - Part 3</a></li>
-      <li><a href='/part4' class='selected'><i>collision detection</i> - Part 4</a></li>
-      <li><a href='/part5'><i>computer AI</i> - Part 5</a></li>
+      <li><a href='/part4'><i>collision detection</i> - Part 4</a></li>
+      <li><a href='/part5' class='selected'><i>computer AI</i> - Part 5</a></li>
     </ul>
 
     <div class='description'>
       <p>
-        Adding collision detection makes the game playable for the first time.
-        There is no AI, but a 2 player game is now possible.
+        Adding a simple AI allows us to implement a single player game.
       </p>
       <p>
-        Using naive collision detection, e.g:
-          <pre>  ball.x &lt; paddle.x</pre>
-        would work in a lot of cases but can lead to the ball overlapping the
-        paddle in some cases when the frame interval (dt) is large, or the ball 'just misses'.
+        Press <b>1</b> for a single player game.<br>
+        Press <b>2</b> for a double player game.<br>
+        Press <b>0</b> to watch the computer play itself.
       </p>
       <p>
-        This is corrected using more complex, but realistic line intersection calculations.
+        The AI consists of 2 components, a reaction time, and a prediction
+        error. The better the human player is, the faster the reaction time
+        and the lower the prediction error.
       </p>
       <p>
-        This allows for realistic behavior when the ball 'just misses' and instead
-        bounces off the top or bottom of the bat and out for a goal
+        The AI recalculates its prediction every so often (based on its reaction
+        time) and every time the ball changes direction when it bounces off a wall
       </p>
       <p>
-        The implementation also detects movement of the paddle and
-        applies 'spin' to change the angle of the ball when appropriate
-      </p>
-
+        Here, when you play against the computer you will see a <span style='color:red'>red</span>
+        box indicating the exact point the ball will intercept and a <span style='color:yellow'>yellow</span>
+        box indicating where the computer thinks it will be.
+      </p> 
     </div>
 
   </div>

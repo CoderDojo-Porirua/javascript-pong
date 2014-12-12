@@ -13,19 +13,43 @@ Pong = {
     paddleSpeed:  2,     // should be able to cross court vertically   in 2 seconds
     ballSpeed:    4,     // should be able to cross court horizontally in 4 seconds, at starting speed ...
     ballAccel:    8,     // ... but accelerate as time passes
-    ballRadius:   5
+    ballRadius:   5,
+    stats:        true,
+    predictions:  true
   },
 
   Colors: {
-    walls: 'white',
-    ball:  'white',
-    score: 'white'
+    walls:           'white',
+    ball:            'white',
+    score:           'white',
+    predictionGuess: 'yellow',
+    predictionExact: 'red'
   },
 
   Images: [
     "images/press1.png",
     "images/press2.png",
     "images/winner.png"
+  ],
+
+  Levels: [
+    {aiReaction: 0.2, aiError:  40}, // 0:  ai is losing by 8
+    {aiReaction: 0.3, aiError:  50}, // 1:  ai is losing by 7
+    {aiReaction: 0.4, aiError:  60}, // 2:  ai is losing by 6
+    {aiReaction: 0.5, aiError:  70}, // 3:  ai is losing by 5
+    {aiReaction: 0.6, aiError:  80}, // 4:  ai is losing by 4
+    {aiReaction: 0.7, aiError:  90}, // 5:  ai is losing by 3
+    {aiReaction: 0.8, aiError: 100}, // 6:  ai is losing by 2
+    {aiReaction: 0.9, aiError: 110}, // 7:  ai is losing by 1
+    {aiReaction: 1.0, aiError: 120}, // 8:  tie
+    {aiReaction: 1.1, aiError: 130}, // 9:  ai is winning by 1
+    {aiReaction: 1.2, aiError: 140}, // 10: ai is winning by 2
+    {aiReaction: 1.3, aiError: 150}, // 11: ai is winning by 3
+    {aiReaction: 1.4, aiError: 160}, // 12: ai is winning by 4
+    {aiReaction: 1.5, aiError: 170}, // 13: ai is winning by 5
+    {aiReaction: 1.6, aiError: 180}, // 14: ai is winning by 6
+    {aiReaction: 1.7, aiError: 190}, // 15: ai is winning by 7
+    {aiReaction: 1.8, aiError: 200}  // 16: ai is winning by 8
   ],
 
   //-----------------------------------------------------------------------------
@@ -56,6 +80,8 @@ Pong = {
     if (!this.playing) {
       this.scores = [0, 0];
       this.playing = true;
+      this.leftPaddle.setAuto(numPlayers < 1, this.level(0));
+      this.rightPaddle.setAuto(numPlayers < 2, this.level(1));
       this.ball.reset();
       this.runner.hideCursor();
     }
@@ -65,9 +91,15 @@ Pong = {
     if (this.playing) {
       if (!ask || this.runner.confirm('Abandon game in progress ?')) {
         this.playing = false;
+        this.leftPaddle.setAuto(false);
+        this.rightPaddle.setAuto(false);
         this.runner.showCursor();
       }
     }
+  },
+
+  level: function(playerNo) {
+    return 8 + (this.scores[playerNo] - this.scores[playerNo ? 0 : 1]);
   },
 
   goal: function(playerNo) {
@@ -78,6 +110,8 @@ Pong = {
     }
     else {
       this.ball.reset(playerNo);
+      this.leftPaddle.setLevel(this.level(0));
+      this.rightPaddle.setLevel(this.level(1));
     }
   },
 
@@ -111,19 +145,19 @@ Pong = {
       case Game.KEY.ONE:  this.startSinglePlayer();    break;
       case Game.KEY.TWO:  this.startDoublePlayer();    break;
       case Game.KEY.ESC:  this.stop(true);             break;
-      case Game.KEY.Q:    this.leftPaddle.moveUp();    break;
-      case Game.KEY.A:    this.leftPaddle.moveDown();  break;
-      case Game.KEY.P:    this.rightPaddle.moveUp();   break;
-      case Game.KEY.L:    this.rightPaddle.moveDown(); break;
+      case Game.KEY.Q:    if (!this.leftPaddle.auto)  this.leftPaddle.moveUp();    break;
+      case Game.KEY.A:    if (!this.leftPaddle.auto)  this.leftPaddle.moveDown();  break;
+      case Game.KEY.P:    if (!this.rightPaddle.auto) this.rightPaddle.moveUp();   break;
+      case Game.KEY.L:    if (!this.rightPaddle.auto) this.rightPaddle.moveDown(); break;
     }
   },
 
   onkeyup: function(keyCode) {
     switch(keyCode) {
-      case Game.KEY.Q: this.leftPaddle.stopMovingUp();    break;
-      case Game.KEY.A: this.leftPaddle.stopMovingDown();  break;
-      case Game.KEY.P: this.rightPaddle.stopMovingUp();   break;
-      case Game.KEY.L: this.rightPaddle.stopMovingDown(); break;
+      case Game.KEY.Q: if (!this.leftPaddle.auto)  this.leftPaddle.stopMovingUp();    break;
+      case Game.KEY.A: if (!this.leftPaddle.auto)  this.leftPaddle.stopMovingDown();  break;
+      case Game.KEY.P: if (!this.rightPaddle.auto) this.rightPaddle.stopMovingUp();   break;
+      case Game.KEY.L: if (!this.rightPaddle.auto) this.rightPaddle.stopMovingDown(); break;
     }
   },
 
@@ -260,7 +294,26 @@ Pong = {
       this.down = (dy > 0 ?  dy : 0);
     },
 
+    setAuto: function(on, level) {
+      if (on && !this.auto) {
+        this.auto = true;
+        this.setLevel(level);
+      }
+      else if (!on && this.auto) {
+        this.auto = false;
+        this.setdir(0);
+      }
+    },
+
+    setLevel: function(level) {
+      if (this.auto)
+        this.level = Pong.Levels[level];
+    },
+
     update: function(dt, ball) {
+      if (this.auto)
+        this.ai(dt, ball);
+
       var amount = this.down - this.up;
       if (amount != 0) {
         var y = this.y + (amount * dt * this.speed);
@@ -272,9 +325,83 @@ Pong = {
       }
     },
 
+    ai: function(dt, ball) {
+      if (((ball.x < this.left) && (ball.dx < 0)) ||
+          ((ball.x > this.right) && (ball.dx > 0))) {
+        this.stopMovingUp();
+        this.stopMovingDown();
+        return;
+      }
+
+      this.predict(ball, dt);
+
+      if (this.prediction) {
+        if (this.prediction.y < (this.top + this.height/2 - 5)) {
+          this.stopMovingDown();
+          this.moveUp();
+        }
+        else if (this.prediction.y > (this.bottom - this.height/2 + 5)) {
+          this.stopMovingUp();
+          this.moveDown();
+        }
+        else {
+          this.stopMovingUp();
+          this.stopMovingDown();
+        }
+      }
+    },
+
+    predict: function(ball, dt) {
+      // only re-predict if the ball changed direction, or its been some amount of time since last prediction
+      if (this.prediction &&
+          ((this.prediction.dx * ball.dx) > 0) &&
+          ((this.prediction.dy * ball.dy) > 0) &&
+          (this.prediction.since < this.level.aiReaction)) {
+        this.prediction.since += dt;
+        return;
+      }
+
+      var pt  = Pong.Helper.ballIntercept(ball, {left: this.left, right: this.right, top: -10000, bottom: 10000}, ball.dx * 10, ball.dy * 10);
+      if (pt) {
+        var t = this.minY + ball.radius;
+        var b = this.maxY + this.height - ball.radius;
+
+        while ((pt.y < t) || (pt.y > b)) {
+          if (pt.y < t) {
+            pt.y = t + (t - pt.y);
+          }
+          else if (pt.y > b) {
+            pt.y = t + (b - t) - (pt.y - b);
+          }
+        }
+        this.prediction = pt;
+      }
+      else {
+        this.prediction = null;
+      }
+
+      if (this.prediction) {
+        this.prediction.since = 0;
+        this.prediction.dx = ball.dx;
+        this.prediction.dy = ball.dy;
+        this.prediction.radius = ball.radius;
+        this.prediction.exactX = this.prediction.x;
+        this.prediction.exactY = this.prediction.y;
+        var closeness = (ball.dx < 0 ? ball.x - this.right : this.left - ball.x) / this.pong.width;
+        var error = this.level.aiError * closeness;
+        this.prediction.y = this.prediction.y + Game.random(-error, error);
+      }
+    },
+
     draw: function(ctx) {
       ctx.fillStyle = Pong.Colors.walls;
       ctx.fillRect(this.x, this.y, this.width, this.height);
+      if (this.prediction && this.pong.cfg.predictions) {
+        ctx.strokeStyle = Pong.Colors.predictionExact;
+        ctx.strokeRect(this.prediction.x - this.prediction.radius, this.prediction.exactY - this.prediction.radius, this.prediction.radius*2, this.prediction.radius*2);
+        ctx.strokeStyle = Pong.Colors.predictionGuess;
+        ctx.strokeRect(this.prediction.x - this.prediction.radius, this.prediction.y - this.prediction.radius, this.prediction.radius*2, this.prediction.radius*2);
+      }
     },
 
     moveUp:         function() { this.up   = 1; },
