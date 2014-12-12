@@ -13,8 +13,7 @@ Pong = {
     paddleSpeed:  2,     // should be able to cross court vertically   in 2 seconds
     ballSpeed:    4,     // should be able to cross court horizontally in 4 seconds, at starting speed ...
     ballAccel:    8,     // ... but accelerate as time passes
-    ballRadius:   5,
-    stats:        true
+    ballRadius:   5
   },
 
   Colors: {
@@ -73,7 +72,7 @@ Pong = {
 
   goal: function(playerNo) {
     this.scores[playerNo] += 1;
-    if (this.scores[playerNo] == 1) {
+    if (this.scores[playerNo] == 9) {
       this.menu.declareWinner(playerNo);
       this.stop();
     }
@@ -89,7 +88,6 @@ Pong = {
       var dx = this.ball.dx;
       var dy = this.ball.dy;
       this.ball.update(dt, this.leftPaddle, this.rightPaddle);
-
       if (this.ball.left > this.width)
         this.goal(0);
       else if (this.ball.right < 0)
@@ -139,8 +137,8 @@ Pong = {
       var press1 = pong.images["images/press1.png"];
       var press2 = pong.images["images/press2.png"];
       var winner = pong.images["images/winner.png"];
-      this.press1  = { image: press1, x: 10,                                             y: pong.cfg.wallWidth     };
-      this.press2  = { image: press2, x: (pong.width - press2.width - 10),               y: pong.cfg.wallWidth     };
+      this.press1  = { image: press1, x: 10,                                                 y: pong.cfg.wallWidth     };
+      this.press2  = { image: press2, x: (pong.width - press2.width - 10),                   y: pong.cfg.wallWidth     };
       this.winner1 = { image: winner, x: (pong.width/2) - winner.width - pong.cfg.wallWidth, y: 6 * pong.cfg.wallWidth };
       this.winner2 = { image: winner, x: (pong.width/2)                + pong.cfg.wallWidth, y: 6 * pong.cfg.wallWidth };
     },
@@ -335,6 +333,30 @@ Pong = {
         pos.dy = -pos.dy;
       }
 
+      var paddle = (pos.dx < 0) ? leftPaddle : rightPaddle;
+      var pt     = Pong.Helper.ballIntercept(this, paddle, pos.nx, pos.ny);
+
+      if (pt) {
+        switch(pt.d) {
+          case 'left':
+          case 'right':
+            pos.x = pt.x;
+            pos.dx = -pos.dx;
+            break;
+          case 'top':
+          case 'bottom':
+            pos.y = pt.y;
+            pos.dy = -pos.dy;
+            break;
+        }
+
+        // add/remove spin based on paddle direction
+        if (paddle.up)
+          pos.dy = pos.dy * (pos.dy < 0 ? 0.5 : 1.5);
+        else if (paddle.down)
+          pos.dy = pos.dy * (pos.dy > 0 ? 0.5 : 1.5);
+      }
+
       this.setpos(pos.x,  pos.y);
       this.setdir(pos.dx, pos.dy);
     },
@@ -359,6 +381,61 @@ Pong = {
       var dx2 = dx + (accel * dt) * (dx > 0 ? 1 : -1);
       var dy2 = dy + (accel * dt) * (dy > 0 ? 1 : -1);
       return { nx: (x2-x), ny: (y2-y), x: x2, y: y2, dx: dx2, dy: dy2 };
+    },
+
+    intercept: function(x1, y1, x2, y2, x3, y3, x4, y4, d) {
+      var denom = ((y4-y3) * (x2-x1)) - ((x4-x3) * (y2-y1));
+      if (denom != 0) {
+        var ua = (((x4-x3) * (y1-y3)) - ((y4-y3) * (x1-x3))) / denom;
+        if ((ua >= 0) && (ua <= 1)) {
+          var ub = (((x2-x1) * (y1-y3)) - ((y2-y1) * (x1-x3))) / denom;
+          if ((ub >= 0) && (ub <= 1)) {
+            var x = x1 + (ua * (x2-x1));
+            var y = y1 + (ua * (y2-y1));
+            return { x: x, y: y, d: d};
+          }
+        }
+      }
+      return null;
+    },
+
+    ballIntercept: function(ball, rect, nx, ny) {
+      var pt;
+      if (nx < 0) {
+        pt = Pong.Helper.intercept(ball.x, ball.y, ball.x + nx, ball.y + ny, 
+                                   rect.right  + ball.radius, 
+                                   rect.top    - ball.radius, 
+                                   rect.right  + ball.radius, 
+                                   rect.bottom + ball.radius, 
+                                   "right");
+      }
+      else if (nx > 0) {
+        pt = Pong.Helper.intercept(ball.x, ball.y, ball.x + nx, ball.y + ny, 
+                                   rect.left   - ball.radius, 
+                                   rect.top    - ball.radius, 
+                                   rect.left   - ball.radius, 
+                                   rect.bottom + ball.radius,
+                                   "left");
+      }
+      if (!pt) {
+        if (ny < 0) {
+          pt = Pong.Helper.intercept(ball.x, ball.y, ball.x + nx, ball.y + ny, 
+                                     rect.left   - ball.radius, 
+                                     rect.bottom + ball.radius, 
+                                     rect.right  + ball.radius, 
+                                     rect.bottom + ball.radius,
+                                     "bottom");
+        }
+        else if (ny > 0) {
+          pt = Pong.Helper.intercept(ball.x, ball.y, ball.x + nx, ball.y + ny, 
+                                     rect.left   - ball.radius, 
+                                     rect.top    - ball.radius, 
+                                     rect.right  + ball.radius, 
+                                     rect.top    - ball.radius,
+                                     "top");
+        }
+      }
+      return pt;
     }
 
   }
